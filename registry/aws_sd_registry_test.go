@@ -51,10 +51,10 @@ func newInMemoryProvider(endpoints []*endpoint.Endpoint, onApplyChanges func(cha
 
 func TestAWSSDRegistry_NewAWSSDRegistry(t *testing.T) {
 	p := newInMemoryProvider(nil, nil)
-	_, err := NewAWSSDRegistry(p, "")
+	_, err := NewAWSSDRegistry(p, "", "")
 	require.Error(t, err)
 
-	_, err = NewAWSSDRegistry(p, "owner")
+	_, err = NewAWSSDRegistry(p, "owner", "")
 	require.NoError(t, err)
 }
 
@@ -100,7 +100,7 @@ func TestAWSSDRegistryTest_Records(t *testing.T) {
 		},
 	}
 
-	r, _ := NewAWSSDRegistry(p, "owner")
+	r, _ := NewAWSSDRegistry(p, "owner", "")
 	records, _ := r.Records(context.Background())
 
 	assert.True(t, testutils.SameEndpoints(records, expectedRecords))
@@ -150,7 +150,7 @@ func TestAWSSDRegistry_Records_ApplyChanges(t *testing.T) {
 		}
 		assert.True(t, testutils.SamePlanChanges(mGot, mExpected))
 	})
-	r, err := NewAWSSDRegistry(p, "owner")
+	r, err := NewAWSSDRegistry(p, "owner", "")
 	require.NoError(t, err)
 
 	err = r.ApplyChanges(context.Background(), changes)

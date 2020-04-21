@@ -32,9 +32,10 @@ import (
 
 // TXTRegistry implements registry interface with ownership implemented via associated TXT records
 type TXTRegistry struct {
-	provider provider.Provider
-	ownerID  string //refers to the owner id of the current instance
-	mapper   nameMapper
+	provider        provider.Provider
+	ownerID         string //refers to the owner id of the current instance
+	previousOwnerID string //refers to the last owner id of the current instance
+	mapper          nameMapper
 
 	// cache the records in memory and update on an interval instead.
 	recordsCache            []*endpoint.Endpoint
@@ -43,7 +44,7 @@ type TXTRegistry struct {
 }
 
 // NewTXTRegistry returns new TXTRegistry object
-func NewTXTRegistry(provider provider.Provider, txtPrefix, ownerID string, cacheInterval time.Duration) (*TXTRegistry, error) {
+func NewTXTRegistry(provider provider.Provider, txtPrefix, ownerID string, previousOwnerID string, cacheInterval time.Duration) (*TXTRegistry, error) {
 	if ownerID == "" {
 		return nil, errors.New("owner id cannot be empty")
 	}
@@ -51,10 +52,11 @@ func NewTXTRegistry(provider provider.Provider, txtPrefix, ownerID string, cache
 	mapper := newPrefixNameMapper(txtPrefix)
 
 	return &TXTRegistry{
-		provider:      provider,
-		ownerID:       ownerID,
-		mapper:        mapper,
-		cacheInterval: cacheInterval,
+		provider:        provider,
+		ownerID:         ownerID,
+		previousOwnerID: previousOwnerID,
+		mapper:          mapper,
+		cacheInterval:   cacheInterval,
 	}, nil
 }
 
@@ -125,9 +127,9 @@ func (im *TXTRegistry) Records(ctx context.Context) ([]*endpoint.Endpoint, error
 func (im *TXTRegistry) ApplyChanges(ctx context.Context, changes *plan.Changes) error {
 	filteredChanges := &plan.Changes{
 		Create:    changes.Create,
-		UpdateNew: filterOwnedRecords(im.ownerID, changes.UpdateNew),
-		UpdateOld: filterOwnedRecords(im.ownerID, changes.UpdateOld),
-		Delete:    filterOwnedRecords(im.ownerID, changes.Delete),
+		UpdateNew: filterOwnedRecords(im.ownerID, im.previousOwnerID, changes.UpdateNew),
+		UpdateOld: filterOwnedRecords(im.ownerID, im.previousOwnerID, changes.UpdateOld),
+		Delete:    filterOwnedRecords(im.ownerID, im.previousOwnerID, changes.Delete),
 	}
 	for _, r := range filteredChanges.Create {
 		if r.Labels == nil {
@@ -171,6 +173,7 @@ func (im *TXTRegistry) ApplyChanges(ctx context.Context, changes *plan.Changes) 
 
 	// make sure TXT records are consistently updated as well
 	for _, r := range filteredChanges.UpdateNew {
+		r.Labels[endpoint.OwnerLabelKey] = im.ownerID
 		txt := endpoint.NewEndpoint(im.mapper.toTXTName(r.DNSName), endpoint.RecordTypeTXT, r.Labels.Serialize(true)).WithSetIdentifier(r.SetIdentifier)
 		txt.ProviderSpecific = r.ProviderSpecific
 		filteredChanges.UpdateNew = append(filteredChanges.UpdateNew, txt)

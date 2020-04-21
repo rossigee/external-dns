@@ -37,6 +37,8 @@ type Plan struct {
 	Changes *Changes
 	// DomainFilter matches DNS names
 	DomainFilter endpoint.DomainFilter
+	// Take over ownership of records previously owner by this owner id
+	PreviousOwnerId string
 }
 
 // Changes holds lists of actions to be executed by dns providers
@@ -133,10 +135,18 @@ func (p *Plan) Calculate() *Plan {
 
 			// TODO: allows record type change, which might not be supported by all dns providers
 			if row.current != nil && len(row.candidates) > 0 { //dns name is taken
+				var shouldUpdateOwner = false
+				currentOwnerId := row.current.Labels[endpoint.OwnerLabelKey]
+				if p.PreviousOwnerId != "" && currentOwnerId == p.PreviousOwnerId {
+					shouldUpdateOwner = true
+				}
+
 				update := t.resolver.ResolveUpdate(row.current, row.candidates)
 				// compare "update" to "current" to figure out if actual update is required
-				if shouldUpdateTTL(update, row.current) || targetChanged(update, row.current) || shouldUpdateProviderSpecific(update, row.current) {
-					inheritOwner(row.current, update)
+				if shouldUpdateTTL(update, row.current) || targetChanged(update, row.current) || shouldUpdateProviderSpecific(update, row.current) || shouldUpdateOwner {
+					if !shouldUpdateOwner {
+						inheritOwner(row.current, update)
+					}
 					changes.UpdateNew = append(changes.UpdateNew, update)
 					changes.UpdateOld = append(changes.UpdateOld, row.current)
 				}

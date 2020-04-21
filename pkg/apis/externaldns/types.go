@@ -109,6 +109,7 @@ type Config struct {
 	Registry                          string
 	TXTOwnerID                        string
 	TXTPrefix                         string
+	TXTPreviousOwnerID                string
 	Interval                          time.Duration
 	Once                              bool
 	DryRun                            bool
@@ -205,6 +206,7 @@ var defaultConfig = &Config{
 	Registry:                    "txt",
 	TXTOwnerID:                  "default",
 	TXTPrefix:                   "",
+	TXTPreviousOwnerID:          "",
 	TXTCacheInterval:            0,
 	Interval:                    time.Minute,
 	Once:                        false,
@@ -393,6 +395,7 @@ func (cfg *Config) ParseFlags(args []string) error {
 	app.Flag("registry", "The registry implementation to use to keep track of DNS record ownership (default: txt, options: txt, noop, aws-sd)").Default(defaultConfig.Registry).EnumVar(&cfg.Registry, "txt", "noop", "aws-sd")
 	app.Flag("txt-owner-id", "When using the TXT registry, a name that identifies this instance of ExternalDNS (default: default)").Default(defaultConfig.TXTOwnerID).StringVar(&cfg.TXTOwnerID)
 	app.Flag("txt-prefix", "When using the TXT registry, a custom string that's prefixed to each ownership DNS record (optional)").Default(defaultConfig.TXTPrefix).StringVar(&cfg.TXTPrefix)
+	app.Flag("txt-previous-owner-id", "When using the TXT registry, a name that identifies an instance this ExternalDNS should claim ownership of (optional)").Default(defaultConfig.TXTPreviousOwnerID).StringVar(&cfg.TXTPreviousOwnerID)
 
 	// Flags related to the main control loop
 	app.Flag("txt-cache-interval", "The interval between cache synchronizations in duration format (default: disabled)").Default(defaultConfig.TXTCacheInterval.String()).DurationVar(&cfg.TXTCacheInterval)

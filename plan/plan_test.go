@@ -46,6 +46,8 @@ type PlanTestSuite struct {
 	domainFilterFiltered2            *endpoint.Endpoint
 	domainFilterFiltered3            *endpoint.Endpoint
 	domainFilterExcluded             *endpoint.Endpoint
+	ownerChangeBefore                *endpoint.Endpoint
+	ownerChangeAfter                 *endpoint.Endpoint
 }
 
 func (suite *PlanTestSuite) SetupTest() {
@@ -183,6 +185,22 @@ func (suite *PlanTestSuite) SetupTest() {
 		DNSName:    "foo.ex.domain.tld",
 		Targets:    endpoint.Targets{"1.1.1.1"},
 		RecordType: "A",
+	}
+	suite.ownerChangeBefore = &endpoint.Endpoint{
+		DNSName:    "foo",
+		Targets:    endpoint.Targets{"127.0.0.1"},
+		RecordType: "A",
+		Labels: map[string]string{
+			endpoint.OwnerLabelKey: "owner1",
+		},
+	}
+	suite.ownerChangeAfter = &endpoint.Endpoint{
+		DNSName:    "foo",
+		Targets:    endpoint.Targets{"127.0.0.1"},
+		RecordType: "A",
+		Labels: map[string]string{
+			endpoint.OwnerLabelKey: "owner2",
+		},
 	}
 }
 
@@ -562,6 +580,28 @@ func (suite *PlanTestSuite) TestDomainFiltersUpdate() {
 	validateEntries(suite.T(), changes.Delete, expectedDelete)
 }
 
+func (suite *PlanTestSuite) TestOwnerChange() {
+	current := []*endpoint.Endpoint{suite.ownerChangeBefore}
+	desired := []*endpoint.Endpoint{suite.ownerChangeAfter}
+	expectedCreate := []*endpoint.Endpoint{}
+	expectedUpdateOld := []*endpoint.Endpoint{suite.ownerChangeBefore}
+	expectedUpdateNew := []*endpoint.Endpoint{suite.ownerChangeAfter}
+	expectedDelete := []*endpoint.Endpoint{}
+
+	p := &Plan{
+		Policies:        []Policy{&SyncPolicy{}},
+		Current:         current,
+		Desired:         desired,
+		PreviousOwnerId: "owner1",
+	}
+
+	changes := p.Calculate().Changes
+	validateEntries(suite.T(), changes.Create, expectedCreate)
+	validateEntries(suite.T(), changes.UpdateNew, expectedUpdateNew)
+	validateEntries(suite.T(), changes.UpdateOld, expectedUpdateOld)
+	validateEntries(suite.T(), changes.Delete, expectedDelete)
+}
+
 func TestPlan(t *testing.T) {
 	suite.Run(t, new(PlanTestSuite))
 }
@@ -569,7 +609,10 @@ func TestPlan(t *testing.T) {
 // validateEntries validates that the list of entries matches expected.
 func validateEntries(t *testing.T, entries, expected []*endpoint.Endpoint) {
 	if !testutils.SameEndpoints(entries, expected) {
-		t.Fatalf("expected %q to match %q", entries, expected)
+		t.Fatalf("expected endpoints %q to match %q", entries, expected)
+	}
+	if !testutils.SameEndpointLabels(entries, expected) {
+		t.Fatalf("expected labels %q to match %q", entries, expected)
 	}
 }
 

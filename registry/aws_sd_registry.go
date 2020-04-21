@@ -27,18 +27,20 @@ import (
 
 // AWSSDRegistry implements registry interface with ownership information associated via the Description field of SD Service
 type AWSSDRegistry struct {
-	provider provider.Provider
-	ownerID  string
+	provider        provider.Provider
+	ownerID         string
+	previousOwnerID string
 }
 
 // NewAWSSDRegistry returns implementation of registry for AWS SD
-func NewAWSSDRegistry(provider provider.Provider, ownerID string) (*AWSSDRegistry, error) {
+func NewAWSSDRegistry(provider provider.Provider, ownerID string, previousOwnerID string) (*AWSSDRegistry, error) {
 	if ownerID == "" {
 		return nil, errors.New("owner id cannot be empty")
 	}
 	return &AWSSDRegistry{
-		provider: provider,
-		ownerID:  ownerID,
+		provider:        provider,
+		ownerID:         ownerID,
+		previousOwnerID: previousOwnerID,
 	}, nil
 }
 
@@ -68,9 +70,9 @@ func (sdr *AWSSDRegistry) Records(ctx context.Context) ([]*endpoint.Endpoint, er
 func (sdr *AWSSDRegistry) ApplyChanges(ctx context.Context, changes *plan.Changes) error {
 	filteredChanges := &plan.Changes{
 		Create:    changes.Create,
-		UpdateNew: filterOwnedRecords(sdr.ownerID, changes.UpdateNew),
-		UpdateOld: filterOwnedRecords(sdr.ownerID, changes.UpdateOld),
-		Delete:    filterOwnedRecords(sdr.ownerID, changes.Delete),
+		UpdateNew: filterOwnedRecords(sdr.ownerID, sdr.previousOwnerID, changes.UpdateNew),
+		UpdateOld: filterOwnedRecords(sdr.ownerID, sdr.previousOwnerID, changes.UpdateOld),
+		Delete:    filterOwnedRecords(sdr.ownerID, sdr.previousOwnerID, changes.Delete),
 	}
 
 	sdr.updateLabels(filteredChanges.Create)
